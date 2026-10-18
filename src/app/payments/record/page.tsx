@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
@@ -8,7 +8,7 @@ import { ArrowLeft, CreditCard, AlertCircle, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { formatINR } from "@/lib/decimal";
 
-export default function RecordPaymentPage() {
+function RecordPaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialResidentId = searchParams.get("residentId") || "";
@@ -292,5 +292,21 @@ export default function RecordPaymentPage() {
         </form>
       </div>
     </AppShell>
+  );
+}
+
+export default function RecordPaymentPage() {
+  return (
+    <Suspense
+      fallback={
+        <AppShell>
+          <div className="max-w-2xl mx-auto p-12 text-center text-xs text-muted-foreground">
+            Loading payment recorder...
+          </div>
+        </AppShell>
+      }
+    >
+      <RecordPaymentContent />
+    </Suspense>
   );
 }

@@ -34,6 +34,8 @@ async function ensureExpensesTable() {
   }
 }
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

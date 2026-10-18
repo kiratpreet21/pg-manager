@@ -7,14 +7,9 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error(
-    "DATABASE_URL environment variable is not set. " +
-    "Copy .env.example to .env.local and fill in your Supabase connection string."
-  );
-}
+const connectionString =
+  process.env.DATABASE_URL ||
+  "postgresql://postgres:dummy@aws-0-ap-south-1.pooler.supabase.com:5432/postgres";
 
 // Prevent multiple connections in Next.js dev hot-reload
 const globalForDb = globalThis as unknown as {

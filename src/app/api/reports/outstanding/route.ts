@@ -5,6 +5,8 @@ import { residents, roomOccupancies, rooms, portions, monthlyBills, payments } f
 import { eq, and, isNull, desc } from "drizzle-orm";
 import { calcOutstanding } from "@/lib/decimal";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

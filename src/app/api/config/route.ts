@@ -5,6 +5,8 @@ import { config, auditLog } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { recordAudit } from "@/lib/audit";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

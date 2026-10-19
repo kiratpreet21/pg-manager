@@ -25,10 +25,13 @@ import {
   CheckCircle2,
   AlertTriangle
 } from "lucide-react";
+import { ensureCustomRentColumns } from "@/db/ensure-columns";
 
 export default async function DashboardPage() {
   const session = await auth();
   if (!session) redirect("/login");
+
+  await ensureCustomRentColumns();
 
   // 1. Current cycle
   const currentCycle = getCurrentCycleStart();

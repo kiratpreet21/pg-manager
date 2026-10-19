@@ -49,7 +49,7 @@ export interface CalculationResult {
 }
 
 /**
- * Calculates bills for all active residents for a given 15th-to-15th billing cycle.
+ * Calculates bills for all active residents for a given 1st-to-1st monthly billing cycle.
  */
 export async function calculateCycleBills(cycleStartDate: string): Promise<{
   success: boolean;

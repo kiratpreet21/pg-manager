@@ -45,7 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: "FINANCIALS & METERS",
     items: [
       { href: "/meters", label: "12 Submeters", icon: Gauge, badge: "₹10/unit", badgeColor: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
-      { href: "/billing", label: "Monthly Bills", icon: Receipt, badge: "15th-15th", badgeColor: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
+      { href: "/billing", label: "Monthly Bills", icon: Receipt, badge: "1st-1st", badgeColor: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
       { href: "/payments", label: "Payments Ledger", icon: CreditCard },
       { href: "/security-deposits", label: "Security Deposits", icon: ShieldCheck },
       { href: "/expenses", label: "Expenses & P&L", icon: TrendingUp, badge: "P&L", badgeColor: "bg-rose-500/10 text-rose-600 dark:text-rose-400" },
@@ -170,7 +170,7 @@ export function AppSidebar({ onClose }: { onClose?: () => void }) {
           </div>
           <div className="flex justify-between pt-0.5 border-t border-border/40 text-[9px] text-muted-foreground/80">
             <span>Billing Cycle:</span>
-            <span className="font-bold">15th to 15th</span>
+            <span className="font-bold">1st to 1st</span>
           </div>
         </div>
       </div>

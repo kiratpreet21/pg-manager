@@ -234,7 +234,7 @@ export const metersRelations = relations(meters, ({ one, many }) => ({
 
 // ─────────────────────────────────────────────────────────────
 // METER READINGS  (append-only; one opening + one closing per cycle)
-// cycle_start_date is always a 15th — enforced in application layer
+// cycle_start_date is the 1st of the month (e.g. 2026-10-01)
 // ─────────────────────────────────────────────────────────────
 export const meterReadings = pgTable(
   "meter_readings",
@@ -243,7 +243,7 @@ export const meterReadings = pgTable(
     meterId: integer("meter_id")
       .notNull()
       .references(() => meters.id),
-    cycleStartDate: date("cycle_start_date").notNull(), // always 15th
+    cycleStartDate: date("cycle_start_date").notNull(), // 1st of month
     readingType: text("reading_type").notNull(),  // "opening" | "closing"
     readingValue: numeric("reading_value", { precision: 10, scale: 2 }).notNull(),
     readAt: date("read_at").notNull(),   // actual date reading was physically taken
@@ -289,9 +289,9 @@ export const monthlyBills = pgTable(
       .notNull()
       .references(() => residents.id),
 
-    // Billing cycle: e.g. 15-Oct-2026 → 15-Nov-2026
-    cycleStartDate: date("cycle_start_date").notNull(),  // always 15th
-    cycleEndDate: date("cycle_end_date").notNull(),      // always 15th of next month
+    // Billing cycle: e.g. 1-Oct-2026 → 1-Nov-2026
+    cycleStartDate: date("cycle_start_date").notNull(),  // 1st of month
+    cycleEndDate: date("cycle_end_date").notNull(),      // 1st of next month
 
     status: text("status").notNull().default("DRAFT"),
     // "DRAFT" → "FINALIZED" → cannot change; "VOID" for corrections

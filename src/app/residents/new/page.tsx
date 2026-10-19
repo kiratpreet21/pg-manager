@@ -344,7 +344,7 @@ export default function NewResidentPage() {
                   className="w-full px-3 py-2 text-sm bg-background border border-border rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Rent is charged for full cycle (15th–15th) as confirmed
+                  Rent is charged for full cycle (1st–1st of next month) as confirmed
                 </p>
               </div>
 

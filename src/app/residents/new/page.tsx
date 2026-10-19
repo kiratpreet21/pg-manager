@@ -33,6 +33,7 @@ export default function NewResidentPage() {
   const [notes, setNotes] = useState("");
 
   const [roomId, setRoomId] = useState("");
+  const [customRent, setCustomRent] = useState("5500.00");
   const [moveInDate, setMoveInDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [hasFood, setHasFood] = useState(true);
 
@@ -112,6 +113,7 @@ export default function NewResidentPage() {
           emergencyContactPhone: emergencyContactPhone.trim() || null,
           notes: notes.trim() || null,
           roomId: Number(roomId),
+          customRent: customRent ? customRent.trim() : "5500.00",
           moveInDate,
           hasFood,
           securityDepositAmount: securityDepositAmount ? Number(securityDepositAmount) : null,
@@ -343,6 +345,32 @@ export default function NewResidentPage() {
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
                   Rent is charged for full cycle (15th–15th) as confirmed
+                </p>
+              </div>
+
+              <div className="sm:col-span-2 pt-2 border-t border-border/60">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-foreground">
+                    Monthly Base Rent (₹)
+                  </label>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-primary/10 text-primary uppercase">
+                    Single Occupancy Configurable
+                  </span>
+                </div>
+                <div className="relative max-w-xs">
+                  <span className="absolute left-3 top-2.5 font-bold text-xs text-muted-foreground">₹</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="5500.00"
+                    value={customRent}
+                    onChange={(e) => setCustomRent(e.target.value)}
+                    className="w-full pl-7 pr-3 py-2 text-sm bg-background border border-border rounded-md text-foreground font-mono font-bold focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Default is ₹5,500 for standard 2-sharing. If this room is <strong>single occupied</strong>, enter your custom room rent here (e.g. ₹8,000, ₹9,000, or ₹10,000).
                 </p>
               </div>
             </div>

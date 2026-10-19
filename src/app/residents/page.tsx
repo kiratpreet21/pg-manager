@@ -13,7 +13,8 @@ import {
   Utensils,
   CreditCard,
   ShieldCheck,
-  Building
+  Building,
+  Trash2
 } from "lucide-react";
 import { formatDate } from "@/lib/billing-cycle";
 
@@ -35,6 +36,7 @@ export default function ResidentsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterActive, setFilterActive] = useState<"all" | "active" | "inactive">("active");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchResidents();
@@ -53,6 +55,30 @@ export default function ResidentsPage() {
       console.error("Failed to fetch residents", err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleDelete(id: number, name: string) {
+    if (
+      !window.confirm(
+        `Are you sure you want to permanently delete resident "${name}"?\n\nThis will remove all their records, bills, payments, and room history from the database.`
+      )
+    ) {
+      return;
+    }
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/residents/${id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        fetchResidents();
+      } else {
+        alert(json.error || "Failed to delete resident");
+      }
+    } catch (err: any) {
+      alert(err.message || "An error occurred while deleting resident");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -258,13 +284,23 @@ export default function ResidentsPage() {
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <Link
-                          href={`/residents/${r.id}`}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-card text-xs font-bold text-primary hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all shadow-2xs"
-                        >
-                          <span>Manage</span>
-                          <ArrowRight className="w-3 h-3" />
-                        </Link>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Link
+                            href={`/residents/${r.id}`}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border bg-card text-xs font-bold text-primary hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all shadow-2xs"
+                          >
+                            <span>Manage</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </Link>
+                          <button
+                            onClick={() => handleDelete(r.id, r.name)}
+                            disabled={deletingId === r.id}
+                            title="Permanently Delete Resident"
+                            className="p-1.5 rounded-lg border border-border bg-card text-muted-foreground hover:text-destructive hover:bg-destructive/10 hover:border-destructive/30 transition-all disabled:opacity-50"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

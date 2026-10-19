@@ -13,7 +13,10 @@ import {
   Zap,
   Building,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  Edit2,
+  IndianRupee,
+  X
 } from "lucide-react";
 import { formatDate } from "@/lib/billing-cycle";
 
@@ -34,6 +37,8 @@ interface PortionData {
     availableSlots: number;
     isFull: boolean;
     isVacant: boolean;
+    isSingleOccupied?: boolean;
+    singleRent?: string | null;
     meter: {
       id: number;
       meterCode: string;
@@ -81,6 +86,11 @@ export default function RoomsPage() {
   const [loading, setLoading] = useState(true);
   const [togglingRoom, setTogglingRoom] = useState<number | null>(null);
 
+  // Edit single occupancy rent modal
+  const [editingRoom, setEditingRoom] = useState<{ id: number; name: string; singleRent: string } | null>(null);
+  const [roomRentInput, setRoomRentInput] = useState("");
+  const [savingRent, setSavingRent] = useState(false);
+
   useEffect(() => {
     loadRooms();
   }, []);
@@ -96,6 +106,30 @@ export default function RoomsPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSaveRoomRent(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingRoom) return;
+    setSavingRent(true);
+    try {
+      const res = await fetch("/api/rooms", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomId: editingRoom.id,
+          singleRent: roomRentInput.trim() ? roomRentInput.trim() : null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Failed to update room rent");
+      setEditingRoom(null);
+      loadRooms();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setSavingRent(false);
     }
   }
 
@@ -237,9 +271,25 @@ export default function RoomsPage() {
                                   ? "Vacant (0/2)"
                                   : "1 Slot Open (1/2)"}
                               </span>
+                              {room.occupants.length === 1 && (
+                                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/20">
+                                  Single Occupied
+                                </span>
+                              )}
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                              <button
+                                onClick={() => {
+                                  setEditingRoom({ id: room.id, name: room.name, singleRent: room.singleRent || "" });
+                                  setRoomRentInput(room.singleRent || "");
+                                }}
+                                className="font-mono text-[11px] font-bold bg-muted text-foreground hover:bg-primary/10 hover:text-primary px-2 py-0.5 rounded border border-border/80 transition-all flex items-center gap-1"
+                                title="Configure Single Occupancy Rent for this room"
+                              >
+                                <IndianRupee className="w-3 h-3 text-primary" />
+                                <span>{room.singleRent ? `₹${room.singleRent}` : "Set Single Rent"}</span>
+                              </button>
                               {room.meter && (
                                 <span className="font-mono text-xs font-bold bg-muted/80 text-foreground px-2 py-0.5 rounded border border-border/80">
                                   ⚡ {room.meter.meterCode}
@@ -318,6 +368,71 @@ export default function RoomsPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Set Single Occupancy Rent Modal */}
+        {editingRoom && (
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-card border border-border rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                    <IndianRupee className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Single Occupancy Rent</h3>
+                    <p className="text-[11px] text-muted-foreground">{editingRoom.name}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setEditingRoom(null)}
+                  className="p-1 rounded text-muted-foreground hover:bg-muted"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveRoomRent} className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-foreground font-bold mb-1">
+                    Monthly Rent for Single Occupant (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 font-bold text-muted-foreground">₹</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="e.g. 8500.00 (leave empty for standard ₹5,500)"
+                      value={roomRentInput}
+                      onChange={(e) => setRoomRentInput(e.target.value)}
+                      className="w-full pl-7 pr-3 py-2 text-sm bg-background border border-border rounded-lg text-foreground font-mono font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
+                    When only 1 resident is living in <strong>{editingRoom.name}</strong>, this custom rent amount will automatically apply in the billing calculator instead of the standard ₹5,500 rate.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => setEditingRoom(null)}
+                    className="px-3 py-1.5 rounded-md border border-border text-muted-foreground hover:bg-muted font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingRent}
+                    className="px-4 py-1.5 rounded-md bg-primary text-primary-foreground font-bold hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {savingRent ? "Saving..." : "Save Room Rent"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </div>

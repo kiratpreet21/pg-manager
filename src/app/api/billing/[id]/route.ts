@@ -62,13 +62,14 @@ export async function PATCH(
   }
 
   try {
-    const { otherCharges, otherCredits, otherNotes } = await req.json();
+    const { baseRent, otherCharges, otherCredits, otherNotes } = await req.json();
 
+    const newBaseRent = baseRent !== undefined && Number(baseRent) >= 0 ? String(Number(baseRent).toFixed(2)) : bill.baseRent;
     const newCharges = otherCharges !== undefined ? String(Number(otherCharges).toFixed(2)) : bill.otherCharges;
     const newCredits = otherCredits !== undefined ? String(Number(otherCredits).toFixed(2)) : bill.otherCredits;
 
     const newTotal = calcBillTotal({
-      baseRent: bill.baseRent,
+      baseRent: newBaseRent,
       foodCharge: bill.foodCharge,
       electricityCharge: bill.electricityCharge,
       otherCharges: newCharges,
@@ -78,6 +79,7 @@ export async function PATCH(
     await db
       .update(monthlyBills)
       .set({
+        baseRent: newBaseRent,
         otherCharges: newCharges,
         otherCredits: newCredits,
         otherNotes: otherNotes !== undefined ? otherNotes : bill.otherNotes,
@@ -91,7 +93,7 @@ export async function PATCH(
       recordId: billId,
       action: "UPDATE",
       actor: session.user?.email || "admin",
-      payload: { billId, newCharges, newCredits, newTotal },
+      payload: { billId, newBaseRent, newCharges, newCredits, newTotal },
     });
 
     return NextResponse.json({ success: true, message: "Bill updated" });

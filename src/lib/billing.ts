@@ -86,6 +86,8 @@ export async function calculateCycleBills(cycleStartDate: string): Promise<{
       roomId: roomOccupancies.roomId,
       roomName: rooms.name,
       roomIsActive: rooms.isActive,
+      roomSingleRent: rooms.singleRent,
+      customRent: roomOccupancies.customRent,
       portionId: rooms.portionId,
       portionName: portions.name,
     })
@@ -234,9 +236,20 @@ export async function calculateCycleBills(cycleStartDate: string): Promise<{
       new Decimal(roomShare).plus(kitchenShare)
     ).toFixed(2);
 
-    // E. Total bill
+    // E. Base Rent determination:
+    // 1. If resident occupancy has an explicit custom rent (> 0), use that!
+    // 2. If room has only 1 occupant (single occupied) and room has singleRent (> 0), use that!
+    // 3. Fallback to baseRentDefault (from config: ₹5,500.00)
+    let residentBaseRent = baseRentDefault;
+    if (occ.customRent && Number(occ.customRent) > 0) {
+      residentBaseRent = toMoney(occ.customRent).toFixed(2);
+    } else if (roomOccupants.length === 1 && occ.roomSingleRent && Number(occ.roomSingleRent) > 0) {
+      residentBaseRent = toMoney(occ.roomSingleRent).toFixed(2);
+    }
+
+    // F. Total bill
     const totalAmount = calcBillTotal({
-      baseRent: baseRentDefault,
+      baseRent: residentBaseRent,
       foodCharge,
       electricityCharge: electricityTotal,
       otherCharges: "0.00",
@@ -248,7 +261,7 @@ export async function calculateCycleBills(cycleStartDate: string): Promise<{
       residentName: occ.residentName,
       roomName: occ.roomName,
       portionName: occ.portionName,
-      baseRent: baseRentDefault,
+      baseRent: residentBaseRent,
       foodCharge,
       hasFood,
       electricityCharge: electricityTotal,

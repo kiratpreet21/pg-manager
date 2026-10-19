@@ -14,10 +14,15 @@ import { encryptData, decryptData } from "@/lib/crypto";
 import { recordAudit } from "@/lib/audit";
 import { getCurrentCycleStart } from "@/lib/billing-cycle";
 import { format } from "date-fns";
+import { ensureCustomRentColumns } from "@/db/ensure-columns";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  await ensureCustomRentColumns();
 
   const { searchParams } = new URL(req.url);
   const includeInactive = searchParams.get("includeInactive") === "true";
@@ -39,6 +44,8 @@ export async function GET(req: NextRequest) {
       occupancyId: roomOccupancies.id,
       roomId: roomOccupancies.roomId,
       roomName: rooms.name,
+      roomSingleRent: rooms.singleRent,
+      customRent: roomOccupancies.customRent,
       portionId: rooms.portionId,
       portionName: portions.name,
       moveInDate: roomOccupancies.moveInDate,
@@ -84,6 +91,7 @@ export async function POST(req: NextRequest) {
       emergencyContactPhone,
       notes,
       roomId,
+      customRent,
       moveInDate,
       hasFood,
       securityDepositAmount,
@@ -143,12 +151,16 @@ export async function POST(req: NextRequest) {
       })
       .returning();
 
-    // 2. Create room occupancy
+    // 2. Create room occupancy with custom rent if provided
+    const parsedCustomRent =
+      customRent && Number(customRent) > 0 ? String(Number(customRent).toFixed(2)) : null;
+
     const [occupancy] = await db
       .insert(roomOccupancies)
       .values({
         residentId: newResident.id,
         roomId: Number(roomId),
+        customRent: parsedCustomRent,
         moveInDate: moveInDate,
         moveOutDate: null,
       })

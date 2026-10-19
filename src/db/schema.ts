@@ -78,6 +78,7 @@ export const rooms = pgTable(
       .references(() => portions.id),
     name: text("name").notNull(),           // "A-Room1", "A-Room2", etc.
     capacity: smallint("capacity").notNull().default(2),  // max 2 girls per room
+    singleRent: numeric("single_rent", { precision: 10, scale: 2 }), // Custom rent if single occupied
     isActive: boolean("is_active").notNull().default(true),  // false = room closed
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -138,6 +139,7 @@ export const roomOccupancies = pgTable(
     roomId: integer("room_id")
       .notNull()
       .references(() => rooms.id),
+    customRent: numeric("custom_rent", { precision: 10, scale: 2 }), // Custom rent for this resident (e.g. single occupancy)
     moveInDate: date("move_in_date").notNull(),
     moveOutDate: date("move_out_date"),   // NULL = currently active
     createdAt: timestamp("created_at", { withTimezone: true })

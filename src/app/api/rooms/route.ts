@@ -5,9 +5,15 @@ import { portions, rooms, meters, roomOccupancies, residents } from "@/db/schema
 import { eq, and, isNull } from "drizzle-orm";
 import { recordAudit } from "@/lib/audit";
 
+import { ensureCustomRentColumns } from "@/db/ensure-columns";
+
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  await ensureCustomRentColumns();
 
   // 1. Fetch all portions
   const allPortions = await db.select().from(portions).orderBy(portions.name);
@@ -26,6 +32,7 @@ export async function GET() {
       residentId: roomOccupancies.residentId,
       residentName: residents.name,
       residentPhone: residents.phone,
+      customRent: roomOccupancies.customRent,
       moveInDate: roomOccupancies.moveInDate,
     })
     .from(roomOccupancies)
@@ -49,11 +56,13 @@ export async function GET() {
 
         return {
           ...room,
+          singleRent: room.singleRent || null,
           meter: roomMeter || null,
           occupants,
           availableSlots,
           isFull: occupants.length >= room.capacity,
           isVacant: occupants.length === 0,
+          isSingleOccupied: occupants.length === 1,
         };
       });
 
@@ -77,35 +86,53 @@ export async function PATCH(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  await ensureCustomRentColumns();
+
   try {
-    const { roomId, isActive } = await req.json();
+    const { roomId, isActive, singleRent } = await req.json();
     if (!roomId) {
       return NextResponse.json({ error: "roomId required" }, { status: 400 });
     }
 
-    // If closing room, check that there are no active occupants
-    if (isActive === false) {
-      const activeOccupants = await db
-        .select()
-        .from(roomOccupancies)
-        .where(
-          and(
-            eq(roomOccupancies.roomId, Number(roomId)),
-            isNull(roomOccupancies.moveOutDate)
-          )
-        );
+    const updates: Record<string, any> = {};
 
-      if (activeOccupants.length > 0) {
-        return NextResponse.json(
-          { error: "Cannot close a room that currently has active residents. Move them out or change rooms first." },
-          { status: 400 }
-        );
+    if (isActive !== undefined) {
+      // If closing room, check that there are no active occupants
+      if (isActive === false) {
+        const activeOccupants = await db
+          .select()
+          .from(roomOccupancies)
+          .where(
+            and(
+              eq(roomOccupancies.roomId, Number(roomId)),
+              isNull(roomOccupancies.moveOutDate)
+            )
+          );
+
+        if (activeOccupants.length > 0) {
+          return NextResponse.json(
+            { error: "Cannot close a room that currently has active residents. Move them out or change rooms first." },
+            { status: 400 }
+          );
+        }
       }
+      updates.isActive = Boolean(isActive);
+    }
+
+    if (singleRent !== undefined) {
+      updates.singleRent =
+        singleRent !== null && String(singleRent).trim() !== "" && Number(singleRent) > 0
+          ? String(Number(singleRent).toFixed(2))
+          : null;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: "No fields to update provided" }, { status: 400 });
     }
 
     await db
       .update(rooms)
-      .set({ isActive: Boolean(isActive) })
+      .set(updates)
       .where(eq(rooms.id, Number(roomId)));
 
     await recordAudit({
@@ -113,10 +140,10 @@ export async function PATCH(req: NextRequest) {
       recordId: Number(roomId),
       action: "UPDATE",
       actor: session.user?.email || "admin",
-      payload: { roomId, isActive },
+      payload: { roomId, ...updates },
     });
 
-    return NextResponse.json({ success: true, message: "Room updated" });
+    return NextResponse.json({ success: true, message: "Room updated successfully" });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to update room" }, { status: 500 });
   }

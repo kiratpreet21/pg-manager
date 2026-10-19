@@ -36,6 +36,7 @@ export default function BillDetailPage() {
   const [error, setError] = useState("");
 
   // Adjustment states for draft bills
+  const [baseRent, setBaseRent] = useState("5500.00");
   const [otherCharges, setOtherCharges] = useState("0.00");
   const [otherCredits, setOtherCredits] = useState("0.00");
   const [otherNotes, setOtherNotes] = useState("");
@@ -62,6 +63,7 @@ export default function BillDetailPage() {
 
       if (billJson.success) {
         setBill(billJson.data);
+        setBaseRent(billJson.data.baseRent || "5500.00");
         setOtherCharges(billJson.data.otherCharges || "0.00");
         setOtherCredits(billJson.data.otherCredits || "0.00");
         setOtherNotes(billJson.data.otherNotes || "");
@@ -92,6 +94,7 @@ export default function BillDetailPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          baseRent: Number(baseRent) || 0,
           otherCharges: Number(otherCharges) || 0,
           otherCredits: Number(otherCredits) || 0,
           otherNotes,
@@ -485,7 +488,26 @@ export default function BillDetailPage() {
             <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
               Adjust Draft Bill (One-time charges or credits)
             </h3>
-            <form onSubmit={handleSaveAdjustments} className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <form onSubmit={handleSaveAdjustments} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-foreground">
+                    Base Rent (₹)
+                  </label>
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-primary/10 text-primary">
+                    Single Room Override
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={baseRent}
+                  onChange={(e) => setBaseRent(e.target.value)}
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground font-mono font-bold focus:ring-2 focus:ring-ring"
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-foreground mb-1">
                   Extra Charges (₹)
@@ -520,21 +542,21 @@ export default function BillDetailPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. advance adjustment"
+                  placeholder="e.g. single room rent / advance"
                   value={otherNotes}
                   onChange={(e) => setOtherNotes(e.target.value)}
                   className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:ring-2 focus:ring-ring"
                 />
               </div>
 
-              <div className="sm:col-span-3 flex justify-end">
+              <div className="sm:col-span-2 lg:col-span-4 flex justify-end">
                 <button
                   type="submit"
                   disabled={savingAdjustments}
                   className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground font-bold text-xs px-5 py-2 rounded-xl hover:bg-primary/90 transition-all shadow-xs disabled:opacity-50"
                 >
                   <Save className="w-3.5 h-3.5" />
-                  <span>{savingAdjustments ? "Saving..." : "Update Adjustments"}</span>
+                  <span>{savingAdjustments ? "Saving..." : "Update Bill Adjustments"}</span>
                 </button>
               </div>
             </form>

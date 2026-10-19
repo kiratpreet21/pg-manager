@@ -8,13 +8,18 @@ import {
   portions, 
   foodPreferences, 
   monthlyBills, 
+  billLineItems,
   payments, 
-  securityDeposits 
+  securityDeposits,
+  config
 } from "@/db/schema";
-import { eq, and, isNull, desc } from "drizzle-orm";
+import { eq, and, isNull, desc, inArray } from "drizzle-orm";
 import { encryptData, decryptData } from "@/lib/crypto";
 import { recordAudit } from "@/lib/audit";
 import { calcOutstanding } from "@/lib/decimal";
+import { ensureCustomRentColumns } from "@/db/ensure-columns";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(
   req: NextRequest,
@@ -22,6 +27,8 @@ export async function GET(
 ) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  await ensureCustomRentColumns();
 
   const residentId = Number(params.id);
   if (!residentId) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
@@ -40,6 +47,8 @@ export async function GET(
       id: roomOccupancies.id,
       roomId: roomOccupancies.roomId,
       roomName: rooms.name,
+      roomSingleRent: rooms.singleRent,
+      customRent: roomOccupancies.customRent,
       portionId: rooms.portionId,
       portionName: portions.name,
       moveInDate: roomOccupancies.moveInDate,
@@ -316,9 +325,116 @@ export async function PATCH(
       return NextResponse.json({ success: true, message: "Food preference updated" });
     }
 
+    if (action === "update_rent") {
+      const { rentAmount } = body;
+      const currentOccupancy = await db.query.roomOccupancies.findFirst({
+        where: and(
+          eq(roomOccupancies.residentId, residentId),
+          isNull(roomOccupancies.moveOutDate)
+        ),
+      });
+
+      if (!currentOccupancy) {
+        return NextResponse.json({ error: "Resident has no active room occupancy." }, { status: 400 });
+      }
+
+      const parsedRent =
+        rentAmount !== undefined && rentAmount !== null && String(rentAmount).trim() !== "" && Number(rentAmount) > 0
+          ? String(Number(rentAmount).toFixed(2))
+          : null;
+
+      await db
+        .update(roomOccupancies)
+        .set({ customRent: parsedRent })
+        .where(eq(roomOccupancies.id, currentOccupancy.id));
+
+      await recordAudit({
+        tableName: "room_occupancies",
+        recordId: currentOccupancy.id,
+        action: "UPDATE",
+        actor: session.user?.email || "admin",
+        payload: { action: "update_rent", residentId, rentAmount: parsedRent },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: parsedRent ? `Rent updated to ₹${parsedRent}` : "Rent reset to default base rent",
+        customRent: parsedRent,
+      });
+    }
+
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   } catch (err: any) {
     console.error("Error updating resident:", err);
     return NextResponse.json({ error: err.message || "Failed to update resident" }, { status: 500 });
   }
 }
+
+/**
+ * Permanently delete any resident and all their associated records
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const residentId = Number(params.id);
+  if (!residentId) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+
+  try {
+    const resident = await db.query.residents.findFirst({
+      where: eq(residents.id, residentId),
+    });
+
+    if (!resident) {
+      return NextResponse.json({ error: "Resident not found" }, { status: 404 });
+    }
+
+    // 1. Find all bills for this resident to delete line items
+    const residentBills = await db
+      .select({ id: monthlyBills.id })
+      .from(monthlyBills)
+      .where(eq(monthlyBills.residentId, residentId));
+
+    const billIds = residentBills.map((b) => b.id);
+    if (billIds.length > 0) {
+      await db.delete(billLineItems).where(inArray(billLineItems.billId, billIds));
+      await db.delete(monthlyBills).where(eq(monthlyBills.residentId, residentId));
+    }
+
+    // 2. Delete payments
+    await db.delete(payments).where(eq(payments.residentId, residentId));
+
+    // 3. Delete security deposits
+    await db.delete(securityDeposits).where(eq(securityDeposits.residentId, residentId));
+
+    // 4. Delete food preferences
+    await db.delete(foodPreferences).where(eq(foodPreferences.residentId, residentId));
+
+    // 5. Delete room occupancies
+    await db.delete(roomOccupancies).where(eq(roomOccupancies.residentId, residentId));
+
+    // 6. Delete resident
+    await db.delete(residents).where(eq(residents.id, residentId));
+
+    // 7. Audit log
+    await recordAudit({
+      tableName: "residents",
+      recordId: residentId,
+      action: "VOID",
+      actor: session.user?.email || "admin",
+      payload: { action: "delete_resident", residentName: resident.name, residentId },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Resident "${resident.name}" and all related data have been permanently deleted.`,
+    });
+  } catch (err: any) {
+    console.error("Error deleting resident:", err);
+    return NextResponse.json({ error: err.message || "Failed to delete resident" }, { status: 500 });
+  }
+}
+

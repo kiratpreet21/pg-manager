@@ -17,7 +17,11 @@ import {
   AlertCircle,
   CheckCircle2,
   Calendar,
-  Utensils
+  Utensils,
+  Trash2,
+  Edit,
+  X,
+  IndianRupee
 } from "lucide-react";
 import { formatCycle, formatDate, getCurrentCycleStart } from "@/lib/billing-cycle";
 import { formatINR } from "@/lib/decimal";
@@ -53,9 +57,66 @@ export default function ResidentDetailPage() {
   // Food toggle state
   const [updatingFood, setUpdatingFood] = useState(false);
 
+  // Delete resident state
+  const [deletingResident, setDeletingResident] = useState(false);
+
+  // Edit rent state
+  const [showRentModal, setShowRentModal] = useState(false);
+  const [editRentAmount, setEditRentAmount] = useState("");
+  const [updatingRent, setUpdatingRent] = useState(false);
+
   useEffect(() => {
     loadResident();
   }, [residentId]);
+
+  async function handleDeleteResident() {
+    if (
+      !window.confirm(
+        `Are you sure you want to permanently delete "${resident?.name}"?\n\nThis will permanently delete all bills, payments, security deposits, and history for this resident.`
+      )
+    ) {
+      return;
+    }
+
+    setDeletingResident(true);
+    try {
+      const res = await fetch(`/api/residents/${residentId}`, { method: "DELETE" });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        alert(`Resident "${resident?.name}" was permanently deleted.`);
+        router.push("/residents");
+      } else {
+        alert(json.error || "Failed to delete resident");
+      }
+    } catch (err: any) {
+      alert(err.message || "An error occurred");
+    } finally {
+      setDeletingResident(false);
+    }
+  }
+
+  async function handleUpdateRent(e: React.FormEvent) {
+    e.preventDefault();
+    setUpdatingRent(true);
+    try {
+      const res = await fetch(`/api/residents/${residentId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update_rent",
+          rentAmount: editRentAmount.trim() ? editRentAmount.trim() : null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || "Failed to update rent");
+      setShowRentModal(false);
+      loadResident();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setUpdatingRent(false);
+    }
+  }
 
   async function loadResident() {
     setLoading(true);
@@ -231,7 +292,7 @@ export default function ResidentDetailPage() {
                 </button>
                 <button
                   onClick={() => setShowMoveOutModal(true)}
-                  className="px-3 py-1.5 text-xs font-medium border border-destructive/30 text-destructive rounded-md hover:bg-destructive/10 transition-colors flex items-center gap-1.5"
+                  className="px-3 py-1.5 text-xs font-medium border border-border text-muted-foreground rounded-md hover:bg-muted transition-colors flex items-center gap-1.5"
                 >
                   <UserMinus className="w-3.5 h-3.5" />
                   <span>Move Out</span>
@@ -242,6 +303,15 @@ export default function ResidentDetailPage() {
                 Resident has moved out
               </span>
             )}
+
+            <button
+              onClick={handleDeleteResident}
+              disabled={deletingResident}
+              className="px-3 py-1.5 text-xs font-bold border border-rose-500/30 text-rose-600 dark:text-rose-400 rounded-md hover:bg-rose-500/10 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{deletingResident ? "Deleting..." : "Delete Resident"}</span>
+            </button>
           </div>
         </div>
 
@@ -343,6 +413,43 @@ export default function ResidentDetailPage() {
                         ))
                       )}
                     </p>
+                  </div>
+
+                  {/* Monthly Base Rent info */}
+                  <div className="col-span-2 pt-3 border-t border-border/70 flex items-center justify-between">
+                    <div>
+                      <span className="text-[11px] text-muted-foreground font-medium">Monthly Base Rent:</span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="font-black text-foreground text-sm font-mono">
+                          ₹{resident.currentOccupancy.customRent || resident.currentOccupancy.roomSingleRent || "5500.00"}
+                        </span>
+                        {resident.currentOccupancy.customRent ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                            Custom / Single Occupancy
+                          </span>
+                        ) : resident.currentOccupancy.roomSingleRent && resident.roommates.length === 0 ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                            Room Single Rate
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-medium text-muted-foreground">
+                            (Standard Base Rate)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {resident.isActive && (
+                      <button
+                        onClick={() => {
+                          setEditRentAmount(resident.currentOccupancy.customRent || "");
+                          setShowRentModal(true);
+                        }}
+                        className="px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-muted font-bold text-xs text-primary transition-all flex items-center gap-1 shadow-2xs"
+                      >
+                        <Edit className="w-3 h-3" />
+                        <span>Edit Rent</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -725,6 +832,68 @@ export default function ResidentDetailPage() {
                     className="px-4 py-1.5 rounded-md bg-destructive text-destructive-foreground font-medium disabled:opacity-50"
                   >
                     {moveOutSubmitting ? "Processing..." : "Complete Move-Out"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Base Rent Modal */}
+        {showRentModal && (
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-card border border-border rounded-xl shadow-xl max-w-md w-full p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-border pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                    <IndianRupee className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-sm font-bold text-foreground">Update Monthly Base Rent</h3>
+                </div>
+                <button
+                  onClick={() => setShowRentModal(false)}
+                  className="p-1 rounded text-muted-foreground hover:bg-muted"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateRent} className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-foreground font-bold mb-1">
+                    Base Rent for {resident.name} (₹)
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 font-bold text-muted-foreground">₹</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="e.g. 8500.00 (leave empty to reset to default)"
+                      value={editRentAmount}
+                      onChange={(e) => setEditRentAmount(e.target.value)}
+                      className="w-full pl-7 pr-3 py-2 text-sm bg-background border border-border rounded-lg text-foreground font-mono font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
+                    Set a custom rent if this resident is staying in a <strong>single-occupied room</strong> (e.g. ₹8,000, ₹9,000, or ₹10,000). Clear the field to reset to default ₹5,500.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => setShowRentModal(false)}
+                    className="px-3 py-1.5 rounded-md border border-border text-muted-foreground hover:bg-muted font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updatingRent}
+                    className="px-4 py-1.5 rounded-md bg-primary text-primary-foreground font-bold hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {updatingRent ? "Saving..." : "Save Rent"}
                   </button>
                 </div>
               </form>
